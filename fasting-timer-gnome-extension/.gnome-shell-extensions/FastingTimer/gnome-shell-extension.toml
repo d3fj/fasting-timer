@@ -1,0 +1,12 @@
+[extension_settings]
+name = "Fasting Timer GNOME"
+uuid = "fasting-timer@def-linux"
+
+version = 1
+
+default-settings = {
+    "duration_minutes" = 90,
+    "format_preference" = "hms",
+    "show_weekly_stats" = true,
+    "show_monthly_stats" = true
+}

@@ -1,0 +1,13 @@
+{
+    "name": "Fasting Timer GNOME",
+    "runtime": 44,
+    "shell-version": [
+        "43",
+        "44"
+    ],
+    "uuid": "fasting-timer@def-linux",
+    "description": "Tiempo de ayuno configurable visualmente en el panel superior",
+    "version": "2.0",
+    "icon-themed-background": false,
+    "settings-schema": "org.gnome.shell.fasting-timer"
+}

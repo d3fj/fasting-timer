@@ -1,0 +1,32 @@
+[Unit]
+Description=Fasting Timer Backend API Service (Node.js Universal HTTP Server)
+Documentation=https://github.com/def/fasting-timer-backend
+After=network.target
+
+[Service]
+Type=simple
+User=def
+# Run Node.js server directly (no additional runtime dependency needed beyond Node/systemd)
+ExecStart=/usr/bin/node /home/def/Code/fasting-timer-backend/server.js
+WorkingDirectory=/home/def/Code/fasting-timer-backend
+
+# Restart policy - auto-restart on failure
+Restart=on-failure
+RestartSec=3s
+
+# Resource limits (optional but good practice)
+MemoryMax=128M
+CPUQuota=50%
+
+# Security hardening for systemd services
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=false # We need write access to /data directory
+
+# Set environment variables
+Environment=BUN_ENV=production
+Environment=DATADIR=/home/def/Code/fasting-timer-backend/data
+
+[Install]
+WantedBy=sockets.target multi-user.target multi-session.target

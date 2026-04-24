@@ -1,0 +1,22 @@
+{
+  "name": "fasting-timer-chrome-extension",
+  "version": "1.0.0",
+  "description": "Fasting Timer Chrome Extension - Development version for testing GNOME extension logic",
+  "manifest_version": 3,
+  "permissions": [
+    "storage",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://localhost:3001/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Fasting Timer - Chrome Extension"
+  },
+  "icons": {
+    "48": "icon-48.png",
+    "96": "icon-96.png"
+  }
+}

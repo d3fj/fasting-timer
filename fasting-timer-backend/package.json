@@ -1,0 +1,13 @@
+{
+  "name": "fasting-timer-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Fasting Timer GNOME/KDE/ universal application",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["fasting-timer", "api", "gnome-shell", "kde-plasma", "waybar"],
+  "author": "",
+  "license": "MIT"
+}

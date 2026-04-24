@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Fasting Timer - Estadísticas</title>
+  
+  <!-- CSP permite fetch a localhost:3001 para API backend -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' http://localhost:3001; script-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'">
+  
+  <!-- Estilos inline (permitidos por CSP en 'style-src 'unsafe-inline' o 'font-src') -->
+  <style>
+    * { box-sizing: border-box; }
+    
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      padding: 15px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-width: 280px;
+      min-height: 220px;
+    }
+    
+    .timer-display {
+      font-size: 3em;
+      text-align: center;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .settings-group,
+    .stats-section {
+      background: rgba(255,255,255,0.95);
+      color: #333;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    
+    .settings-group strong { display: block; margin-bottom: 5px; }
+    .stats-section strong { display: block; margin-bottom: 6px; font-size: 14px; }
+    
+    .stats-row {
+      font-size: 10.5px;
+      padding: 3px 0;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .stats-row:last-child { border-bottom: none; }
+    
+    .btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 11px;
+      margin-right: 4px;
+      margin-top: 4px;
+    }
+    
+    .btn:hover { background: #5a6fd6; }
+    .btn.active { background: #28a745; box-shadow: 0 2px 3px rgba(0,165,69,0.4); }
+    
+    h3 { margin: 0 0 8px 0; font-size: 13px; color: #555; }
+    
+    .small-note {
+      font-size: 240px; margin-top: 5px;}
+  </style>
+  
+  <!-- Carga script externo (CSP compliant) -->
+  <script src="popup-script.js"></script>
+</head>
+
+<body>
+  
+  <div class="timer-display" id="timerDisplay">⏱️</div>
+  
+  <div class="settings-group" style="background:rgba(255,255,255,0.9);color:#333;border-radius:8px;padding:10px;min-height:60px;">
+    <strong>⏱️ Configuración:</strong><br>
+    
+    <!-- Botones para cambiar tiempo -->
+    <div style="margin-top:5px;">
+      <button class="btn" data-duration="75">1h 15m</button> | 
+      <button class="btn" data-duration="90">1h 30m</button>
+    </div>
+    
+    <div style="margin-top:4px;font-size:10px;color:#666;">
+      *Selecciona un botón arriba para reiniciar el timer<br>
+      La selección se guarda automáticamente
+    </div>
+    
+  </div>
+
+  <div class="stats-section" style="background:rgba(255,255,255,0.9);color:#333;border-radius:8px;padding:10px;">
+    <strong>📊 Estadísticas:</strong><br>
+    
+    <!-- Tiempo actual formateado -->
+    <div class="stats-row" style="font-weight:bold;background:#eef;font-size:12px;font-weight:bold;margin:5px 0;padding:3px;border-bottom:2px solid #ddd;">⏱️ Actualmente: <span id="timeDisplay">75m</span></div>
+    
+    <!-- Total sesiones -->
+    <div class="stats-row" style="font-size:11px;margin:4px 0;padding:2px;border-bottom:1px solid #eee;">Total: <span id="totalSessions">---</span></div>
+    
+    <!-- Promedios por día (semanal y mensual) -->
+    <div class="stats-row" style="font-size:10px;margin:3px 0;padding:2px;background:#f5f7ff;border-bottom:1px solid #ddd;">📅 Semanas anteriores: <span id="weeklySessions">---</span></div>
+    <div class="stats-row" style="font-size:10px;margin:3px 0;padding:2px;"><strong>Sesiones/día:</strong><br>
+      <span style="font-size:9px;">🔵 Últimos 7 días (promedio): <span id="weeklyPerDay">---</span></span><br>
+      🟣 Mes actual: <span id="monthlyPerDay">---</span></div>
+    </div>
+    
+    <!-- Promedios de minutos por sesión -->
+    <div class="stats-row" style="font-size:10px;margin:3px 0;padding:2px;background:#f5f9e8;border-bottom:1px solid #ccc;">⏱️ Minutos por sesión (promedio móvil):<br>
+      <span style="font-size:9px;">🔵 Semanal (últimas 4 semanas): <span id="weeklyMinutes">---m</span></span><br>
+      🟣 Mensual (mes en curso): <span id="monthlyMinutes">---m</span></div>
+    </div>
+    
+  </div>
+
+</body>
+</html>
