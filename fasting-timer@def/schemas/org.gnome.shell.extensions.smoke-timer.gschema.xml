@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.smoke-timer" path="/org/gnome/shell/extensions/smoke-timer/">
+    <key name="start-date" type="s">
+      <default>'2026-04-04'</default>
+      <summary>Fecha de inicio</summary>
+      <description>Fecha desde la que se calculan las medias (formato YYYY-MM-DD)</description>
+    </key>
+    <key name="time-format" type="s">
+      <default>'minutes'</default>
+      <summary>Formato de tiempo</summary>
+      <description>Formato de visualización del temporizador en el panel</description>
+    </key>
+    <key name="timer-emoji" type="s">
+      <default>'🍕'</default>
+      <summary>Emoji del temporizador</summary>
+      <description>Emoji que se muestra en el panel</description>
+    </key>
+  </schema>
+</schemalist>

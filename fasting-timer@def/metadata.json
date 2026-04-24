@@ -1,0 +1,7 @@
+{
+  "name": "Fasting Timer GNOME",
+  "description": "Temporizador con backend API para stats modernas (total_sessions, weeklyAvg, monthlyAvg)",
+  "uuid": "fasting-timer@def",
+  "shell-version": ["46", "47", "48", "49"],
+  "version": "1.0.0"
+}
