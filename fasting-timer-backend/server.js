@@ -135,25 +135,34 @@ function serializeCSVRow(timestamp, elapsedSeconds) {
 
 // Append click/timer data to CSV file (used by /api/end endpoint)
 function appendClick(elapsedSeconds, timestamp = new Date()) {
+  let currentContent = "";
+  let hasHeader = false;
+  
   try {
-    let currentContent = "";
-    let hasHeader = false;
-    
     // Create CSV file with header if it doesn't exist
     if (!fs.existsSync(PRIMARY_CSV_PATH)) {
       const header = "timestamp_iso,elapsed_seconds\n";
       fs.writeFileSync(PRIMARY_CSV_PATH, header, "utf-8");
       hasHeader = true;
+      currentContent = header;
     } else {
-      currentContent = fs.readFileSync(PRIMARY_CSV_PATH, "utf-8");
-      const lines = currentContent.split("\n");
-      hasHeader = lines.some((line) => line.includes("timestamp_iso"));
-    }
-
-    // Don't add header again if it already exists
-    if (!hasHeader) {
-      const header = "timestamp_iso,elapsed_seconds\n";
-      currentContent = header + currentContent;
+      const rawContent = fs.readFileSync(PRIMARY_CSV_PATH, "utf-8");
+      const lines = rawContent.split("\n").filter(Boolean); // Remove empty lines
+      
+      // Check if first line is header
+      hasHeader = lines[0]?.startsWith("timestamp_iso");
+      
+      // Remove any duplicate header lines (keep only first occurrence)
+      const contentLines = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Skip if it's a duplicate header (not first occurrence)
+        if (line.startsWith("timestamp_iso") && contentLines.length > 0) {
+          continue;
+        }
+        contentLines.push(line);
+      }
+      currentContent = contentLines.join("\n");
     }
 
     const newRow = serializeCSVRow(timestamp, elapsedSeconds);
