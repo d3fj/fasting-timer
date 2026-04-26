@@ -13,10 +13,16 @@ const PRIMARY_DATA_DIR = process.env.XDG_DATA_HOME
   : join(homedir(), ".local", "share", "fasting-timer");
 const PRIMARY_CSV_PATH = join(PRIMARY_DATA_DIR, "log.csv");
 
+// Cache directory for transient state (timer state, not session logs)
+const CACHE_DIR = process.env.XDG_CACHE_HOME
+  ? join(process.env.XDG_CACHE_HOME, "fasting-timer")
+  : join(homedir(), ".cache", "fasting-timer");
+const STATE_JSON_PATH = join(CACHE_DIR, "state.json");
+
 // Default configuration - can be overridden via query params
 const DEFAULT_PORT = 3001;
 const HOSTNAME = "localhost";
-const DEFAULT_DURATION_SECONDS = 9000;
+const DEFAULT_DURATION_SECONDS = parseInt(process.env.FASTING_INTERVAL) || 9000; // 2h30m default
 
 // Ensure primary data directory exists
 if (!fs.existsSync(PRIMARY_DATA_DIR)) {
@@ -28,8 +34,52 @@ if (!fs.existsSync(PRIMARY_DATA_DIR)) {
   }
 }
 
+// Ensure cache directory exists for state.json
+if (!fs.existsSync(CACHE_DIR)) {
+  try {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    console.log(`📁 Created cache directory: ${CACHE_DIR}`);
+  } catch (err) {
+    throw new Error(`Cannot create cache directory: ${CACHE_DIR}`);
+  }
+}
+
 // CSV helpers
 const DATA_COLUMNS = ["timestamp_iso", "elapsed_seconds"];
+
+// State helpers for timer persistence
+
+function readState() {
+  try {
+    if (!fs.existsSync(STATE_JSON_PATH)) {
+      return null;
+    }
+    const content = fs.readFileSync(STATE_JSON_PATH, "utf-8");
+    const state = JSON.parse(content);
+    // Calculate elapsed_seconds if start exists
+    if (state.start) {
+      const startTime = new Date(state.start).getTime();
+      const now = Date.now();
+      state.elapsed_seconds = Math.floor((now - startTime) / 1000);
+    }
+    return state;
+  } catch (error) {
+    console.error("[readState] Error:", error.message);
+    return null;
+  }
+}
+
+function writeState(state) {
+  try {
+    // Remove elapsed_seconds before saving (it's calculated, not persisted)
+    const { elapsed_seconds, ...persistable } = state;
+    fs.writeFileSync(STATE_JSON_PATH, JSON.stringify(persistable, null, 2), "utf-8");
+    return true;
+  } catch (error) {
+    console.error("[writeState] Error:", error.message);
+    return false;
+  }
+}
 
 function parseCSVLine(line) {
   if (!line || !line.trim()) return null;
@@ -87,23 +137,27 @@ function serializeCSVRow(timestamp, elapsedSeconds) {
 function appendClick(elapsedSeconds, timestamp = new Date()) {
   try {
     let currentContent = "";
+    let hasHeader = false;
+    
+    // Create CSV file with header if it doesn't exist
     if (!fs.existsSync(PRIMARY_CSV_PATH)) {
-      throw new Error(`File not exists: ${PRIMARY_CSV_PATH}`);
+      const header = "timestamp_iso,elapsed_seconds\n";
+      fs.writeFileSync(PRIMARY_CSV_PATH, header, "utf-8");
+      hasHeader = true;
+    } else {
+      currentContent = fs.readFileSync(PRIMARY_CSV_PATH, "utf-8");
+      const lines = currentContent.split("\n");
+      hasHeader = lines.some((line) => line.includes("timestamp_iso"));
     }
 
-    currentContent = fs.readFileSync(PRIMARY_CSV_PATH, "utf-8");
-
-    const lines = currentContent.split("\n");
-    if (!lines.some((line) => line.includes("timestamp_iso="))) {
-      lines.unshift("timestamp_iso,elapsed_seconds");
-    } else {
-      // Remove any existing headers
-      lines.splice(0, 1);
+    // Don't add header again if it already exists
+    if (!hasHeader) {
+      const header = "timestamp_iso,elapsed_seconds\n";
+      currentContent = header + currentContent;
     }
 
     const newRow = serializeCSVRow(timestamp, elapsedSeconds);
-    const updatedContent =
-      [...lines.filter((l) => l.trim()), newRow].join("\n") + "\n";
+    const updatedContent = currentContent.trim() + "\n" + newRow + "\n";
 
     fs.writeFileSync(PRIMARY_CSV_PATH, updatedContent, "utf-8");
     return true;
@@ -411,6 +465,103 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: error.message }));
       }
     });
+  } else if (endpoint === "start") {
+    // POST /api/start - start a new fasting session
+    if (req.method !== "POST") {
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+
+    req.on("end", () => {
+      try {
+        const payload = JSON.parse(body) || {};
+        const interval = payload.interval || DEFAULT_DURATION_SECONDS;
+
+        // Validate interval (min 60 seconds, max 7 days)
+        if (interval < 60 || interval > 7 * 24 * 60 * 60) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid interval: must be between 60 and 604800 seconds" }));
+          return;
+        }
+
+        const state = {
+          start: new Date().toISOString(),
+          interval: interval,
+          status: "fasting",
+        };
+
+        if (!writeState(state)) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Failed to write state" }));
+          return;
+        }
+
+        console.log(`🥹 Fasting started: ${interval}s (${interval / 60}min)`);
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          start: state.start,
+          interval: state.interval,
+          status: state.status,
+        }, null, 2));
+      } catch (error) {
+        console.error("[/api/start] Error:", error.message);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: error.message }));
+      }
+    });
+  } else if (endpoint === "state") {
+    // GET /api/state - get current fasting state
+    const state = readState();
+
+    if (!state || !state.start) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        status: "idle",
+        elapsed_seconds: 0,
+      }, null, 2));
+      return;
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      start: state.start,
+      interval: state.interval,
+      status: state.status,
+      elapsed_seconds: state.elapsed_seconds,
+    }, null, 2));
+  } else if (endpoint === "cancel") {
+    // POST /api/cancel - cancel current fasting session
+    if (req.method !== "POST") {
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
+    const state = readState();
+    if (!state || !state.start) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ status: "cancelled" }, null, 2));
+      return;
+    }
+
+    // Clear the state file
+    if (!writeState({})) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Failed to clear state" }));
+      return;
+    }
+
+    console.log(`❌ Fasting cancelled`);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "cancelled" }, null, 2));
   } else {
     // Unknown endpoint or invalid method
     res.writeHead(404);
@@ -470,5 +621,5 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 console.log(
-  `✅ Server ready to serve stats and clicks on ports /api/stats and /api/end`,
+  `✅ Server ready: /api/stats, /api/end, /api/start, /api/state, /api/cancel`,
 );

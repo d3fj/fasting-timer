@@ -12,6 +12,8 @@ const BASE_URL      = 'http://localhost:3001';
 const GLITCH_CHARS  = '!@#$%^&*0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ<>?/\\|~`';
 const GLITCH_TARGET = 'Pizza';
 const GLITCH_MS     = 70;
+const RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1000;
 
 function randomChar() {
     return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
@@ -67,6 +69,47 @@ function fetchStats(callback) {
         });
     } catch (e) {
         console.error(`SmokeTimer: fetch error: ${e.message}`);
+        callback(null);
+    }
+}
+
+// Fetch with retry logic - for API state endpoints
+function fetchWithRetry(url, attempts, delayMs, callback) {
+    try {
+        const session = new Soup.Session();
+        const message = Soup.Message.new('GET', url);
+
+        session.send_and_read_async(message, GLib.PRIORITY_DEFAULT, null, (sess, result) => {
+            try {
+                const bytes = sess.send_and_read_finish(result);
+                if (message.get_status() !== Soup.Status.OK) {
+                    // Retry if failed
+                    if (attempts > 1) {
+                        GLib.timeout_add(GLib.PRIORITY_DEFAULT, delayMs, () => {
+                            fetchWithRetry(url, attempts - 1, delayMs, callback);
+                            return GLib.SOURCE_REMOVE;
+                        });
+                    } else {
+                        callback(null);
+                    }
+                    return;
+                }
+                const text = new TextDecoder().decode(bytes.get_data());
+                callback(JSON.parse(text));
+            } catch (e) {
+                console.error(`SmokeTimer: fetchWithRetry error: ${e.message}`);
+                if (attempts > 1) {
+                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, delayMs, () => {
+                        fetchWithRetry(url, attempts - 1, delayMs, callback);
+                        return GLib.SOURCE_REMOVE;
+                    });
+                } else {
+                    callback(null);
+                }
+            }
+        });
+    } catch (e) {
+        console.error(`SmokeTimer: fetchWithRetry error: ${e.message}`);
         callback(null);
     }
 }
@@ -149,8 +192,22 @@ export default class SmokeTimerExtension extends Extension {
     }
 
     _getStartDate() {
+        // Use cached state from backend if available, otherwise fallback to GSettings
+        if (this._cachedState && this._cachedState.start && this._cachedState.status === 'fasting') {
+            return new Date(this._cachedState.start);
+        }
+        // Fallback to GSettings
         const iso = this._settings.get_string('start-date');
-        return new Date(iso);
+        return iso ? new Date(iso) : null;
+    }
+
+    // Refresh cached state from backend
+    _refreshState() {
+        fetchWithRetry(`${BASE_URL}/api/state`, RETRY_ATTEMPTS, RETRY_DELAY_MS, (state) => {
+            if (state) {
+                this._cachedState = state;
+            }
+        });
     }
 
     _getFormat() {
@@ -245,6 +302,9 @@ export default class SmokeTimerExtension extends Extension {
     }
 
     _refreshStats() {
+        // Also refresh cached state from backend
+        this._refreshState();
+        
         fetchStats((stats) => {
             if (!stats) {
                 this._itemTotal.label.set_text('⚠️ Backend no disponible');
