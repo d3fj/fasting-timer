@@ -83,8 +83,8 @@ def get_tooltip():
     if not stats or stats.get("total_sessions", 0) == 0:
         return "No sessions yet"
     total   = stats.get("total_sessions", 0)
-    weekly  = stats.get("weekly_average_minutes", 0)
-    monthly = stats.get("monthly_average_minutes", 0)
+    weekly  = round(stats.get("weekly_average_minutes") or 0)
+    monthly = round(stats.get("monthly_average_minutes") or 0)
     return f"Total: {total} | Weekly: {weekly}min | Monthly: {monthly}min"
 
 
