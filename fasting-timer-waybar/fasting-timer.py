@@ -7,37 +7,38 @@ Installation via symlink:
   ln -s ~/Code/fasting-timer/fasting-timer-waybar/fasting-timer.py ~/.config/waybar/modules/fasting-timer.py
 
 Configuration in waybar config:
-  "exec": "python3 ~/.config/waybar/modules/fasting-timer.py",
-  "exec-interval": 1,
-  "return": exit,
-  "signal": 8,
-  "tooltip": true
+  "custom/fasting-timer": {
+    "exec": "python3 ~/.config/waybar/modules/fasting-timer.py",
+    "interval": 1,
+    "return-type": "json",
+    "format": "{}",
+    "tooltip": true,
+    "on-click": "python3 ~/.config/waybar/modules/fasting-timer.py clicked"
+  }
 
 Click actions:
-  - Left click: Toggle fasting start/end
-  - If fasting: end fast + log to CSV
-  - If idle: start new fast
+  - Left click: Log current session to CSV and restart timer from 0
 """
 
 import json
 import os
 import sys
-import urllib.parse
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
 
 # Backend configuration
 BACKEND_URL = os.environ.get("FASTING_BACKEND_URL", "http://localhost:3001")
-API_STATE = f"{BACKEND_URL}/api/state"
-API_STATS = f"{BACKEND_URL}/api/stats"
-API_START = f"{BACKEND_URL}/api/start"
-API_END = f"{BACKEND_URL}/api/end"
+API_STATE  = f"{BACKEND_URL}/api/state"
+API_STATS  = f"{BACKEND_URL}/api/stats"
+API_START  = f"{BACKEND_URL}/api/start"
+API_END    = f"{BACKEND_URL}/api/end"
 API_CANCEL = f"{BACKEND_URL}/api/cancel"
+
+DEFAULT_INTERVAL = 9000  # 2h30m in seconds
 
 
 def http_get(url):
-    """Make GET request to backend."""
     try:
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=2) as response:
@@ -47,7 +48,6 @@ def http_get(url):
 
 
 def http_post_json(url, data):
-    """Make POST request with JSON body to backend."""
     try:
         req = urllib.request.Request(url, data=json.dumps(data).encode())
         req.add_header("Content-Type", "application/json")
@@ -58,7 +58,6 @@ def http_post_json(url, data):
 
 
 def http_post(url):
-    """Make POST request to backend (no body)."""
     try:
         req = urllib.request.Request(url, method="POST")
         with urllib.request.urlopen(req, timeout=2) as response:
@@ -68,75 +67,110 @@ def http_post(url):
 
 
 def format_time(seconds):
-    """Format seconds as HH:MM:SS."""
+    """Format seconds as XhYYm, Ym or Xs."""
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    if hours > 0:
+        return f"{hours}h{minutes:02d}m"
+    elif minutes > 0:
+        return f"{minutes}m"
+    else:
+        return f"{seconds}s"
 
 
 def get_tooltip():
-    """Get stats for tooltip."""
     stats = http_get(API_STATS)
     if not stats or stats.get("total_sessions", 0) == 0:
         return "No sessions yet"
-
-    total = stats.get("total_sessions", 0)
-    weekly = stats.get("weekly_average_minutes", 0)
+    total   = stats.get("total_sessions", 0)
+    weekly  = stats.get("weekly_average_minutes", 0)
     monthly = stats.get("monthly_average_minutes", 0)
-
     return f"Total: {total} | Weekly: {weekly}min | Monthly: {monthly}min"
 
 
+def get_elapsed_from_last_log():
+    """
+    Returns how many seconds have passed since the last session ended.
+    = last session's elapsed_seconds + seconds since that timestamp.
+    Returns None if no log exists.
+    """
+    stats = http_get(API_STATS)
+    if not stats or not stats.get("latest_data"):
+        return None
+
+    latest = stats["latest_data"]
+    try:
+        last_ts = datetime.fromisoformat(latest["timestamp"].replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        seconds_since_end = int((now - last_ts).total_seconds())
+        last_session_seconds = latest.get("seconds", 0)
+        return last_session_seconds + seconds_since_end
+    except (KeyError, ValueError):
+        return None
+
+
+def build_output(elapsed, interval):
+    """Build waybar JSON output."""
+    if elapsed >= interval:
+        overtime = elapsed - interval
+        text      = f"✓ +{format_time(overtime)}"
+        css_class = "completed"
+    else:
+        remaining = interval - elapsed
+        text      = f"🥹 {format_time(remaining)}"
+        css_class = "fasting"
+
+    return json.dumps({
+        "text":    text,
+        "tooltip": get_tooltip(),
+        "class":   css_class,
+    })
+
+
 def handle_click():
-    """Handle click action: start/end toggle."""
+    """Log current session to CSV, cancel it, and restart from 0."""
     state = http_get(API_STATE)
 
-    if not state or state.get("status") == "idle":
-        # No active fast - start new one
-        http_post_json(API_START, {"interval": 9000})  # 2h30m default
-        print(json.dumps({"text": "🥹 00:00:00"}))
-    else:
-        # Active fast - end and log to CSV
+    if state and state.get("status") != "idle":
         elapsed = state.get("elapsed_seconds", 0)
-        # Log to CSV using JSON body
         http_post_json(API_END, {"interval": elapsed})
-        # Cancel the fast
         http_post(API_CANCEL)
-        print(json.dumps({"text": "✓ 00:00:00"}))
+    else:
+        # No active session — log the display time so CSV stays consistent
+        elapsed_log = get_elapsed_from_last_log()
+        if elapsed_log is not None:
+            http_post_json(API_END, {"interval": elapsed_log})
+
+    # Start fresh session from 0
+    http_post_json(API_START, {"interval": DEFAULT_INTERVAL})
+    print(build_output(0, DEFAULT_INTERVAL))
 
 
 def main():
-    # Check for click signal (waybar sends "clicked" as argument)
     if len(sys.argv) > 1 and sys.argv[1] == "clicked":
         handle_click()
         return
 
-    # Normal mode - query state
     state = http_get(API_STATE)
 
-    if not state or state.get("status") == "idle":
-        # Not fasting - show idle state
-        print(json.dumps({"text": "○", "tooltip": get_tooltip()}))
+    if state and state.get("status") != "idle":
+        # Active session — show live countdown
+        elapsed  = state.get("elapsed_seconds", 0)
+        interval = state.get("interval", DEFAULT_INTERVAL)
+        print(build_output(elapsed, interval))
         return
 
-    # Calculate elapsed time
-    elapsed = state.get("elapsed_seconds", 0)
-    interval = state.get("interval", 0)
+    # No active session — calculate from last log entry, display only
+    elapsed = get_elapsed_from_last_log()
 
-    # Determine if we're in fasting or completed phase
-    emoji = "🥹"  # Fasting (red)
-    if elapsed >= interval:
-        emoji = "✓"  # Completed (green)
+    if elapsed is None:
+        # No log at all — start fresh automatically
+        http_post_json(API_START, {"interval": DEFAULT_INTERVAL})
+        print(build_output(0, DEFAULT_INTERVAL))
+        return
 
-    # Format output for waybar
-    output = {
-        "text": f"{emoji} {format_time(elapsed)}",
-        "tooltip": get_tooltip(),
-        "class": "fasting" if elapsed < interval else "completed"
-    }
-
-    print(json.dumps(output))
+    # Show time based on log without touching backend state
+    print(build_output(elapsed, DEFAULT_INTERVAL))
 
 
 if __name__ == "__main__":

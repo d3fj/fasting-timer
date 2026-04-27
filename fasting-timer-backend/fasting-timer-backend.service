@@ -1,0 +1,13 @@
+[Unit]
+Description=Fasting Timer Backend API Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/def/Code/fasting-timer/fasting-timer-backend
+ExecStart=/usr/bin/node /home/def/Code/fasting-timer/fasting-timer-backend/server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
