@@ -23,24 +23,22 @@ Click actions:
 import json
 import os
 import sys
-import urllib.parse
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
 
 # Backend configuration
 BACKEND_URL = os.environ.get("FASTING_BACKEND_URL", "http://localhost:3001")
-API_STATE = f"{BACKEND_URL}/api/state"
-API_STATS = f"{BACKEND_URL}/api/stats"
-API_START = f"{BACKEND_URL}/api/start"
-API_END = f"{BACKEND_URL}/api/end"
+API_STATE  = f"{BACKEND_URL}/api/state"
+API_STATS  = f"{BACKEND_URL}/api/stats"
+API_START  = f"{BACKEND_URL}/api/start"
+API_END    = f"{BACKEND_URL}/api/end"
 API_CANCEL = f"{BACKEND_URL}/api/cancel"
 
 DEFAULT_INTERVAL = 9000  # 2h30m in seconds
 
 
 def http_get(url):
-    """Make GET request to backend."""
     try:
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=2) as response:
@@ -50,7 +48,6 @@ def http_get(url):
 
 
 def http_post_json(url, data):
-    """Make POST request with JSON body to backend."""
     try:
         req = urllib.request.Request(url, data=json.dumps(data).encode())
         req.add_header("Content-Type", "application/json")
@@ -61,7 +58,6 @@ def http_post_json(url, data):
 
 
 def http_post(url):
-    """Make POST request to backend (no body)."""
     try:
         req = urllib.request.Request(url, method="POST")
         with urllib.request.urlopen(req, timeout=2) as response:
@@ -71,10 +67,9 @@ def http_post(url):
 
 
 def format_time(seconds):
-    """Format seconds as XhYYm or Ym or Xs."""
+    """Format seconds as XhYYm, Ym or Xs."""
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
-
     if hours > 0:
         return f"{hours}h{minutes:02d}m"
     elif minutes > 0:
@@ -84,22 +79,20 @@ def format_time(seconds):
 
 
 def get_tooltip():
-    """Get stats for tooltip."""
     stats = http_get(API_STATS)
     if not stats or stats.get("total_sessions", 0) == 0:
         return "No sessions yet"
-
-    total = stats.get("total_sessions", 0)
-    weekly = stats.get("weekly_average_minutes", 0)
+    total   = stats.get("total_sessions", 0)
+    weekly  = stats.get("weekly_average_minutes", 0)
     monthly = stats.get("monthly_average_minutes", 0)
-
     return f"Total: {total} | Weekly: {weekly}min | Monthly: {monthly}min"
 
 
 def get_elapsed_from_last_log():
     """
-    Calculate how many seconds have elapsed since the last logged session ended.
-    Returns elapsed_since_last_log in seconds, or None if no log exists.
+    Returns how many seconds have passed since the last session ended.
+    = last session's elapsed_seconds + seconds since that timestamp.
+    Returns None if no log exists.
     """
     stats = http_get(API_STATS)
     if not stats or not stats.get("latest_data"):
@@ -107,35 +100,30 @@ def get_elapsed_from_last_log():
 
     latest = stats["latest_data"]
     try:
-        last_timestamp = datetime.fromisoformat(latest["timestamp"].replace("Z", "+00:00"))
+        last_ts = datetime.fromisoformat(latest["timestamp"].replace("Z", "+00:00"))
         now = datetime.now(timezone.utc)
-        seconds_since_last = int((now - last_timestamp).total_seconds())
+        seconds_since_end = int((now - last_ts).total_seconds())
         last_session_seconds = latest.get("seconds", 0)
-
-        # Total elapsed = time of last session + time since it ended
-        return last_session_seconds + seconds_since_last
+        return last_session_seconds + seconds_since_end
     except (KeyError, ValueError):
         return None
 
 
 def build_output(elapsed, interval):
-    """Build waybar JSON output based on elapsed time and interval."""
-    remaining = interval - elapsed
-
+    """Build waybar JSON output."""
     if elapsed >= interval:
-        # Past the target — count upward, show completed emoji
         overtime = elapsed - interval
-        text = f"✓ +{format_time(overtime)}"
+        text      = f"✓ +{format_time(overtime)}"
         css_class = "completed"
     else:
-        # Counting down
-        text = f"🥹 {format_time(remaining)}"
+        remaining = interval - elapsed
+        text      = f"🥹 {format_time(remaining)}"
         css_class = "fasting"
 
     return json.dumps({
-        "text": text,
+        "text":    text,
         "tooltip": get_tooltip(),
-        "class": css_class,
+        "class":   css_class,
     })
 
 
@@ -147,11 +135,14 @@ def handle_click():
         elapsed = state.get("elapsed_seconds", 0)
         http_post_json(API_END, {"interval": elapsed})
         http_post(API_CANCEL)
+    else:
+        # No active session — log the display time so CSV stays consistent
+        elapsed_log = get_elapsed_from_last_log()
+        if elapsed_log is not None:
+            http_post_json(API_END, {"interval": elapsed_log})
 
-    # Always restart from 0
+    # Start fresh session from 0
     http_post_json(API_START, {"interval": DEFAULT_INTERVAL})
-
-    # Output fresh state
     print(build_output(0, DEFAULT_INTERVAL))
 
 
@@ -163,37 +154,23 @@ def main():
     state = http_get(API_STATE)
 
     if state and state.get("status") != "idle":
-        # Active session — continue from current elapsed
-        elapsed = state.get("elapsed_seconds", 0)
+        # Active session — show live countdown
+        elapsed  = state.get("elapsed_seconds", 0)
         interval = state.get("interval", DEFAULT_INTERVAL)
         print(build_output(elapsed, interval))
         return
 
-    # No active session — check last log entry and resume from there
+    # No active session — calculate from last log entry, display only
     elapsed = get_elapsed_from_last_log()
 
     if elapsed is None:
-        # No log at all — start fresh
+        # No log at all — start fresh automatically
         http_post_json(API_START, {"interval": DEFAULT_INTERVAL})
         print(build_output(0, DEFAULT_INTERVAL))
         return
 
-    if elapsed < DEFAULT_INTERVAL:
-        # Still within the window — resume active session with remaining time
-        # Start a new session but pretend it started (elapsed) seconds ago
-        start_time = datetime.now(timezone.utc)
-        import datetime as dt
-        adjusted_start = start_time - dt.timedelta(seconds=elapsed)
-        http_post_json(API_START, {
-            "interval": DEFAULT_INTERVAL,
-            "start": adjusted_start.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        })
-        new_state = http_get(API_STATE)
-        actual_elapsed = new_state.get("elapsed_seconds", elapsed) if new_state else elapsed
-        print(build_output(actual_elapsed, DEFAULT_INTERVAL))
-    else:
-        # Past the window — show overtime, no active session needed
-        print(build_output(elapsed, DEFAULT_INTERVAL))
+    # Show time based on log without touching backend state
+    print(build_output(elapsed, DEFAULT_INTERVAL))
 
 
 if __name__ == "__main__":
