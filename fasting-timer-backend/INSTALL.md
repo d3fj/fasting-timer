@@ -33,7 +33,7 @@ Crear un backend universal compatible con GNOME Shell, KDE Plasma y Waybar media
 
 ```bash
 # Copia tus datos CSV actuales al nuevo backend
-cp ~/.local/share/fasting-timer/log.csv /home/def/Code/fasting-timer-backend/data/log.csv
+cp ~/.local/share/fasting-timer/log.csv /home/d3fj/Code/fasting-timer-backend/data/log.csv
 rm ~/.local/share/fasting-timer/log.csv  # Borra archivo antiguo
 ```
 
@@ -51,7 +51,7 @@ curl -fsSL https://bun.sh/install | sudo bun install -gc
 ### 3. Instalar dependencias
 
 ```bash
-cd /home/def/Code/fasting-timer-backend
+cd /home/d3fj/Code/fasting-timer-backend
 npm init -y  # Crea package.json inicial
 ```
 
@@ -59,7 +59,7 @@ npm init -y  # Crea package.json inicial
 
 ```bash
 sudo mkdir -p /etc/systemd/system
-sudo cp /home/def/Code/fasting-timer-backend/systemd/fasting-timer-backend.service \
+sudo cp /home/d3fj/Code/fasting-timer-backend/systemd/fasting-timer-backend.service \
           /etc/systemd/system/
 ```
 
@@ -78,7 +78,7 @@ systemctl status fasting-timer-backend.service
 ### 6. Iniciar servidor localmente para pruebas
 
 ```bash
-cd /home/def/Code/fasting-timer-backend
+cd /home/d3fj/Code/fasting-timer-backend
 node server.js
 ```
 

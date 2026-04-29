@@ -7,8 +7,8 @@ After=network.target
 Type=simple
 User=def
 # Run Node.js server directly (no additional runtime dependency needed beyond Node/systemd)
-ExecStart=/usr/bin/node /home/def/Code/fasting-timer-backend/server.js
-WorkingDirectory=/home/def/Code/fasting-timer-backend
+ExecStart=/usr/bin/node /home/d3fj/Code/fasting-timer-backend/server.js
+WorkingDirectory=/home/d3fj/Code/fasting-timer-backend
 
 # Restart policy - auto-restart on failure
 Restart=on-failure
@@ -26,7 +26,7 @@ ProtectHome=false # We need write access to /data directory
 
 # Set environment variables
 Environment=BUN_ENV=production
-Environment=DATADIR=/home/def/Code/fasting-timer-backend/data
+Environment=DATADIR=/home/d3fj/Code/fasting-timer-backend/data
 
 [Install]
 WantedBy=sockets.target multi-user.target multi-session.target

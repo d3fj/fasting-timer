@@ -22,7 +22,7 @@ const STATE_JSON_PATH = join(CACHE_DIR, "state.json");
 // Default configuration - can be overridden via query params
 const DEFAULT_PORT = 3001;
 const HOSTNAME = "localhost";
-const DEFAULT_DURATION_SECONDS = parseInt(process.env.FASTING_INTERVAL) || 9000; // 2h30m default
+const DEFAULT_DURATION_SECONDS = parseInt(process.env.FASTING_INTERVAL) || 10800; // 3h00m default
 
 // Ensure primary data directory exists
 if (!fs.existsSync(PRIMARY_DATA_DIR)) {

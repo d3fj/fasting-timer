@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-SRC="/home/def/Code/fasting-timer-gnome-extension"
+SRC="/home/d3fj/Code/fasting-timer-gnome-extension"
 DEST=".gnome-shell-extensions/FastingTimer"
 
 mkdir -p "$DEST/{icons/{16,48},theme}"

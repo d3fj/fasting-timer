@@ -30,7 +30,7 @@ None detected (no .claude/skills/, .agent/skills/, or skills/ directory in proje
 ## Project Conventions
 
 ### AGENTS.md
-- **Path**: `/home/def/Code/fasting-timer/AGENTS.md`
+- **Path**: `/home/d3fj/Code/fasting-timer/AGENTS.md`
 - **Type**: Developer notes / project documentation
 
 ### Stack

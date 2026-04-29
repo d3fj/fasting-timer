@@ -35,7 +35,7 @@ API_START  = f"{BACKEND_URL}/api/start"
 API_END    = f"{BACKEND_URL}/api/end"
 API_CANCEL = f"{BACKEND_URL}/api/cancel"
 
-DEFAULT_INTERVAL = 9000  # 2h30m in seconds
+DEFAULT_INTERVAL = 10800  # 3h00m in seconds
 
 
 def http_get(url):
@@ -83,9 +83,13 @@ def get_tooltip():
     if not stats or stats.get("total_sessions", 0) == 0:
         return "No sessions yet"
     total   = stats.get("total_sessions", 0)
-    weekly  = round(stats.get("weekly_average_minutes") or 0)
-    monthly = round(stats.get("monthly_average_minutes") or 0)
-    return f"Total: {total} | Weekly: {weekly}min | Monthly: {monthly}min"
+    weekly_minutes  = stats.get("weekly_average_minutes") or 0
+    monthly_minutes = stats.get("monthly_average_minutes") or 0
+
+    weekly = format_time(int(weekly_minutes * 60))
+    monthly = format_time(int(monthly_minutes * 60))
+
+    return f"Total: {total} | Weekly: {weekly} | Monthly: {monthly}"
 
 
 def get_elapsed_from_last_log():

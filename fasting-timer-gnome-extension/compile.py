@@ -3,7 +3,7 @@
 import os
 import shutil
 
-SRC = "/home/def/Code/fasting-timer-gnome-extension"
+SRC = "/home/d3fj/Code/fasting-timer-gnome-extension"
 DEST = ".gnome-shell-extensions/FastingTimer"
 os.makedirs(f"{DEST}/icons/{16}")
 os.makedirs(f"{DEST}/icons/{48}")

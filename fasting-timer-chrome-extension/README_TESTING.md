@@ -2,8 +2,8 @@
 
 ## 1️⃣ Copia la carpeta completa:
 ```bash
-cd /home/def/Code/fasting-timer-chrome-extension
-cp -r /home/def/Code/fasting-timer-chrome-extension ~/.local/share/chrome/user-data/extensions
+cd /home/d3fj/Code/fasting-timer-chrome-extension
+cp -r /home/d3fj/Code/fasting-timer-chrome-extension ~/.local/share/chrome/user-data/extensions
 ```
 
 ## 2️⃣ Abrir Chrome y extender desde URL:
@@ -16,7 +16,7 @@ cp -r /home/def/Code/fasting-timer-chrome-extension ~/.local/share/chrome/user-d
 ```bash
 # Abrir Chrome en modo desarrollador con extensión local
 CHROME_PATH="$HOME/.cache/google-chrome"
-cd /home/def/Code/fasting-timer-chrome-extension && \
+cd /home/d3fj/Code/fasting-timer-chrome-extension && \
 echo "Abriendo Chrome para instalar extensión desde:" && \
 echo "chrome://extensions/"
 
